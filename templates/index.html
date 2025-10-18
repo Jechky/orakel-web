@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Orakel Live Scraper</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial; background: #1a1a1a; color: #fff; padding: 20px; }
+        h1 { margin-bottom: 20px; }
+        .controls { background: #2a2a2a; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        .filter-row { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { color: #aaa; font-size: 12px; }
+        select, input[type="number"] { 
+            padding: 8px; 
+            background: #333; 
+            border: 1px solid #444; 
+            color: #fff; 
+            border-radius: 4px;
+            min-width: 120px;
+        }
+        button { 
+            padding: 10px 30px; 
+            background: #2563eb; 
+            color: #fff; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 4px;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+        button:disabled { background: #555; cursor: not-allowed; }
+        #status { margin-top: 15px; color: #aaa; padding: 10px; background: #333; border-radius: 4px; }
+        .stats { margin-bottom: 10px; color: #aaa; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; background: #2a2a2a; }
+        th { text-align: left; padding: 12px; background: #333; font-size: 13px; }
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { background: #3a3a3a; }
+        td { padding: 10px; border-bottom: 1px solid #333; font-size: 13px; }
+        tr.new { background: #1a3a1a; }
+        tr.updated { background: #3a3a1a; }
+        a { color: #60a5fa; }
+        .view-btn { cursor: pointer; text-decoration: underline; }
+        .view-btn:hover { color: #93c5fd; }
+        
+        /* Modal styles */
+        .modal { 
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0; 
+            top: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0,0,0,0.8); 
+            overflow: auto;
+        }
+        .modal.show { display: block; }
+        .modal-content { 
+            background: #2a2a2a; 
+            margin: 50px auto; 
+            padding: 30px; 
+            border-radius: 8px; 
+            width: 90%; 
+            max-width: 900px; 
+            position: relative;
+        }
+        .modal-close { 
+            position: absolute; 
+            right: 20px; 
+            top: 20px; 
+            font-size: 28px; 
+            color: #aaa; 
+            cursor: pointer; 
+        }
+        .modal-close:hover { color: #fff; }
+        .modal-title { font-size: 20px; margin-bottom: 20px; }
+        .modal-loading { text-align: center; padding: 40px; color: #aaa; }
+        .modal-error { text-align: center; padding: 40px; color: #f87171; }
+        .detail-section { margin-bottom: 25px; }
+        .detail-label { color: #aaa; font-size: 12px; margin-bottom: 5px; }
+        .detail-value { color: #fff; font-size: 14px; }
+        .detail-value a { color: #60a5fa; }
+        .image-gallery { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+            gap: 10px; 
+            margin-top: 10px;
+        }
+        .image-gallery img { 
+            width: 100%; 
+            height: 150px; 
+            object-fit: cover; 
+            border-radius: 4px; 
+            cursor: pointer;
+        }
+        .image-gallery img:hover { opacity: 0.8; }
+    </style>
+</head>
+<body>
+    <h1>Orakel Live Scraper - Bazaraki Commercial Properties</h1>
+    
+    <div class="controls">
+        <div class="filter-row">
+            <div class="filter-group">
+                <label>Location</label>
+                <select id="location"></select>
+            </div>
+            <div class="filter-group">
+                <label>Type</label>
+                <select id="type"></select>
+            </div>
+            <div class="filter-group">
+                <label>Sort</label>
+                <select id="sort"></select>
+            </div>
+            <div class="filter-group">
+                <label>Max Pages</label>
+                <input type="number" id="max_pages" value="1" min="1" max="10">
+            </div>
+        </div>
+        
+        <div class="filter-row">
+            <div class="filter-group">
+                <label>Min Price (€)</label>
+                <input type="number" id="min_price" placeholder="e.g. 500">
+            </div>
+            <div class="filter-group">
+                <label>Max Price (€)</label>
+                <input type="number" id="max_price" placeholder="e.g. 5000">
+            </div>
+            <div class="filter-group">
+                <label>Min Sqm</label>
+                <input type="number" id="min_sqm" placeholder="e.g. 50">
+            </div>
+            <div class="filter-group">
+                <label>Max Sqm</label>
+                <input type="number" id="max_sqm" placeholder="e.g. 500">
+            </div>
+        </div>
+        
+        <button id="startBtn">Start Scraping</button>
+        <div id="status">Ready</div>
+    </div>
+    
+    <div class="stats" id="stats">Total: 0 | New: 0 | Updated: 0</div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Title</th>
+                <th class="sortable" onclick="sortTable('price')">Price <span id="sort-price"></span></th>
+                <th>Area</th>
+                <th class="sortable" onclick="sortTable('price_per_sqm')">€/sqm <span id="sort-price_per_sqm"></span></th>
+                <th>Place</th>
+                <th class="sortable" onclick="sortTable('posted')">Posted <span id="sort-posted"></span></th>
+                <th>Link</th>
+            </tr>
+        </thead>
+        <tbody id="results"></tbody>
+    </table>
+    
+    <!-- Detail Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <h2 class="modal-title">Listing Details</h2>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+    
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
